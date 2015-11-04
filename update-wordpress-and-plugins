@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# Script to update WordPress and its plugins by command line interface using WP-CLI
+# Date: 3/11/2015
+# Author: Rebecca Appleton
+# NOTES: If PHP Notices appear in the terminal and you don't want them to, be aware
+# that having the following setting in your wp_config.php file causes errors in plugins 
+# to be displayed in the terminal by WP-CLI and it's not a big concern (though you
+# might want to contact your plugin's writer to tell them about it so they can fix it):
+# 
+# define('WP_DEBUG', false); // enable debugging mode
+# 
+
+
+
+# ### Command parameters
+
+site=$1
+
+### Require root credentials to run this script
+
+if [ "$(whoami)" != 'root' ]; then
+	echo $"You have no permission to run $0 as non-root user. Use sudo";
+	exit 1;
+fi
+
+
+
+### Some functions to update core, plugin and themes
+
+
+# Do core update
+#
+function do_core_update {
+	current_version=$(wp core version --allow-root)
+	new_update_version=$(wp core check-update --field=version --allow-root)
+	report='' # what we'll be printing by way of a report
+
+	if [[ $new_update_version == "Success: WordPress is at the latest version." ]]; then
+		report=$(printf "WordPress was already up-to-date.") #TODO: We don't really need to report this but it's 
+														# handy during testing. Remove later.
+	else
+		report_line=$(wp core update --allow-root)
+		$check_uptodate=$(wp core check-update --field=version --allow-root)
+		if [[ $check_uptodate="Success: WordPress is at the latest version." ]]; then
+			# Generate a line in the report if update was successful
+			report=$(printf "Updated WordPress from $current_version to $new_update_version")
+		else
+			report=$(printf "Tried to update WordPress from $current_version to $new_update_version but had a hiccup somewhere; a human should check this, please.")
+		fi
+	fi
+
+	printf '%s' "$report" >> $REPORT_FILE
+}
+
+
+# Do plugins update
+#
+function do_plugins_update {
+
+	# Get a list of slugs representing the plugins that want updating
+	plugins_needing_updates=$(wp plugin list --field=name --update=available --allow-root) # returns a list we can parse line by line
+
+	report="" # what we'll be printing by way of a report
+
+	for slug in $plugins_needing_updates; do
+
+		# Get the plugin's name
+		name=$(wp plugin get $slug --field=title --allow-root)
+
+		# Get the current version
+		ver=$(wp plugin get $slug --field=version --allow-root)
+
+		# Run the update (and log that we're about to run it)
+		wp plugin update $slug --quiet --allow-root
+		
+		# Get the new version
+		new_ver=$(wp plugin get $slug --field=version --allow-root)
+		
+		# Add it to list of updates we performed and log that it happened
+		if [[ $new_ver != $ver ]]; then
+			report="$report" $(printf "\nUpdated $name from $ver to $new_ver.") #TODO PRoblems with output here. It's only outputting one plugin update per batch run.
+			echo "Updated $name from $ver to $new_ver." >> "$LOG_FILE"
+		else
+			report="$report" $(printf "\nTried to update $name from $ver to $new_ver but had a hiccup somewhere. A human should check this, please.")
+		fi
+	done
+
+	# If we've printed anything to that string, print the details to the log file.
+	report_length=$(printf "%s" "$report"|wc -c)
+	if [[ $report_length -lt 1 ]]; then
+		printf '\n%s\n' "No plugin updates were needed." >> $REPORT_FILE
+		echo "Assessed site as needing no plugin updates." >> "$LOG_FILE"
+	else
+		printf '%s\n' "$report" >> "$REPORT_FILE"
+	fi
+}
+
+
+function print_formatted_intro {
+	name_of_site=$(wp option get blogname --allow-root)
+	url=$(wp option get siteurl --allow-root)
+
+	intro=$(printf "\n----------------------------------------------------------\n$name_of_site : $url\n----------------------------------------------------------\n")
+
+	printf '\n%s\n' "$intro" >> $REPORT_FILE
+}
+
+
+### Check input: we need a site, and it must match a folder we're hosting in our /sites dir
+if [[ "$site" == '' ]]; then
+	echo -e "You need to enter a site to upgrade. (Should correspond to the name of the folder in the /sites directory.)";
+	exit 1;
+else
+	# Do check to ensure we have a folder match
+	cd /sites
+	match=false
+	for dir in *; do
+		if [[ "$dir" == "$site" ]]; then
+		  match=true
+		  break
+		fi
+	done
+
+	### If we have a match, switch to the target dir and run some WP-CLI commands else quit out
+	if [[ "$match" == false ]]; then
+		echo -e "Parameter supplied should correspond to the name of the folder in the /sites directory."
+		exit 1
+	else
+		path="/sites/$dir/www/htdocs"
+		cd $path
+
+		# Files to report updates to
+		REPORT_FILE=~/bin/updates.txt
+		LOG_FILE=/var/log/wordpress_updates.log
+
+		# Do updates; generate report.
+		
+		report_intro=$(print_formatted_intro)
+
+		core_report_line=$(do_core_update)
+
+		plugins_lines=$(do_plugins_update)
+	fi
+
+fi
