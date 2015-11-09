@@ -20,14 +20,14 @@ site=$1
 ### Require root credentials to run this script
 #
 if [ "$(whoami)" != 'root' ]; then
-	echo $"You have no permission to run $0 as non-root user. Use sudo"
+	echo "You have no permission to run $0 as non-root user. Use sudo"
 	exit 1
 fi
 
 ### Require WP-CLI be installed
 #
 if ![ "$(command -v wp)" >/dev/null 2>&1 ]; then
-	echo $"You need to have WP-CLI installed and in your path as 'wp' to use this script."
+	echo "You need to have WP-CLI installed and in your path as 'wp' to use this script."
 	exit 1
 fi
 
