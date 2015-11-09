@@ -72,7 +72,7 @@ function do_core_update {
 	fi
 
 	# Print report and log file entry
-	printf '%s' "$report" >> "$LOG_FILE"
+	printf '%s' "$report" >> $LOG_FILE
 	printf '%s' "$report" >> $REPORT_FILE
 }
 
@@ -82,7 +82,7 @@ function do_core_update {
 function do_plugins_update {
 
 	printf "$(timestamp) Checking for plugin updates...\n"
-	printf "$(timestamp) Checking plugins...\n" >> "$LOG_FILE"
+	printf "$(timestamp) Checking plugins...\n" >> $LOG_FILE
 
 	# Get a list of slugs representing the plugins that want updating
 	plugins_needing_updates=$(wp plugin list --field=name --update=available --allow-root) # returns a list we can parse line by line
@@ -99,7 +99,7 @@ function do_plugins_update {
 
 		# Print to screen and logfile that we're about to begin updating the plugin
 		printf "$(timestamp) Starting update of plugin %s (currently at version %s)...\n" "$name" "$ver"	
-		printf "$(timestamp) Starting update of plugin %s (currently at version %s).\n" "$name" "$ver" >> "$LOG_FILE"
+		printf "$(timestamp) Starting update of plugin %s (currently at version %s).\n" "$name" "$ver" >> $LOG_FILE
 
 		# Do the update
 		updating="$(wp plugin update $slug --format=summary --allow-root)"
@@ -112,12 +112,12 @@ function do_plugins_update {
 			# Print success message to screen
 			printf "$(timestamp) Successfully updated %s from %s to %s.\n" "$name" "$ver" "$new_ver"
 			# Print success message to $report var and log file
-			printf "$(timestamp) Successfully updated %s from %s to %s.\n" "$name" "$ver" "$new_ver" >> "$LOG_FILE"			
+			printf "$(timestamp) Successfully updated %s from %s to %s.\n" "$name" "$ver" "$new_ver" >> $LOG_FILE			
 			report="$report $(printf "\nUpdated %s from %s to %s." "$name" "$ver" "$new_ver")"
 		else
 			# Print failure message to screen, log file and report var
 			printf "$(timestamp) Failed to update %s from %s to %s.\n" "$name" "$ver" "$new_ver"
-			printf "$(timestamp) Failed to update %s from %s to %s.\n" "$name" "$ver" "$new_ver" >> "$LOG_FILE"			
+			printf "$(timestamp) Failed to update %s from %s to %s.\n" "$name" "$ver" "$new_ver" >> $LOG_FILE			
 			report="$report $(printf "\nTried to update %s from %s to %s but update failed. A human should check this, please." "$name" "$var" "$new_ver")"
 		fi
 
@@ -131,10 +131,10 @@ function do_plugins_update {
 		printf "$(timestamp) No plugin updates were found.\n"
 		report="$report $(printf '\n%s\n' "No plugin updates were found.")"
 		# Log this assessment
-		printf "$(timestamp) Assessed site as needing no plugin updates." >> "$LOG_FILE"
+		printf "$(timestamp) Assessed site as needing no plugin updates." >> $LOG_FILE
 	else
 		# Print report of plugins updated and log printing
-		printf "$(timestamp) Updates to site complete. Printing to report." >> "$LOG_FILE"
+		printf "$(timestamp) Updates to site complete. Printing to report." >> $LOG_FILE
 	fi
 
 	# Print to report what updates were made
@@ -189,7 +189,7 @@ else
 		name_of_site=$(wp option get blogname --allow-root)
 		url=$(wp option get siteurl --allow-root)
 		printf "$(timestamp) Checking for updates required on website $name_of_site ($url)\n"
-		printf "$(timestamp) Checking for updates required on website $name_of_site ($url)\n" >> "$LOG_FILE"
+		printf "$(timestamp) Checking for updates required on website $name_of_site ($url)\n" >> $LOG_FILE
 
 		# Print pretty report intro
 		do_formatted_intro
