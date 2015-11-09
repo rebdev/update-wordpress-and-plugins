@@ -18,13 +18,18 @@
 site=$1
 
 ### Require root credentials to run this script
-
+#
 if [ "$(whoami)" != 'root' ]; then
-	echo $"You have no permission to run $0 as non-root user. Use sudo";
-	exit 1;
+	echo $"You have no permission to run $0 as non-root user. Use sudo"
+	exit 1
 fi
 
-
+### Require WP-CLI be installed
+#
+if ![ "$(command -v wp)" >/dev/null 2>&1 ]; then
+	echo $"You need to have WP-CLI installed and in your path as 'wp' to use this script."
+	exit 1
+fi
 
 ### Some functions to update core, plugin and themes
 
@@ -32,24 +37,42 @@ fi
 # Do core update
 #
 function do_core_update {
+
+	# Print to terminal what we're doing
+	printf "$(timestamp) Checking if WordPress core is up-to-date...\n"
+
 	current_version=$(wp core version --allow-root)
 	new_update_version=$(wp core check-update --field=version --allow-root)
 	report='' # what we'll be printing by way of a report
 
 	if [[ $new_update_version == "Success: WordPress is at the latest version." ]]; then
-		report=$(printf "WordPress was already up-to-date.") #TODO: We don't really need to report this but it's 
-														# handy during testing. Remove later.
+		# Print version check result to terminal							
+		printf "$(timestamp) Already at latest version of WordPress core.\n"	
+
+		# Print to report what updates were made
+		report=$(printf "No WordPress updates were found.\n")
+															# 
 	else
-		report_line=$(wp core update --allow-root)
-		$check_uptodate=$(wp core check-update --field=version --allow-root)
-		if [[ $check_uptodate="Success: WordPress is at the latest version." ]]; then
-			# Generate a line in the report if update was successful
-			report=$(printf "Updated WordPress from $current_version to $new_update_version")
+		printf "$(timestamp) Updating WordPress core from $current_version to $new_update_version...\n"	
+		$(wp core update --allow-root)
+
+		$check_if_uptodate=$(wp core check-update --field=version --allow-root)
+
+		if [[ $check_if_uptodate="Success: WordPress is at the latest version." ]]; then
+			# Print result to terminal
+			printf "$(timestamp) Success! WordPress is at the latest version.\n"		
+			# Add a line to the report string if update was successful
+			report=$(printf "Updated WordPress from $current_version to $new_update_version")	
 		else
-			report=$(printf "Tried to update WordPress from $current_version to $new_update_version but had a hiccup somewhere; a human should check this, please.")
+			# Print result to terminal
+			printf "$(timestamp) Failed when trying to update WordPress from $current_version to $new_update_version.\n"	
+			# Add a line to the report string noting there was a failure
+			report=$(printf "Tried to update WordPress from $current_version to $new_update_version but update failed; a human should check this, please.")
 		fi
 	fi
 
+	# Print report and log file entry
+	printf '%s' "$report" >> "$LOG_FILE"
 	printf '%s' "$report" >> $REPORT_FILE
 }
 
@@ -57,6 +80,9 @@ function do_core_update {
 # Do plugins update
 #
 function do_plugins_update {
+
+	printf "$(timestamp) Checking for plugin updates...\n"
+	printf "$(timestamp) Checking plugins...\n" >> "$LOG_FILE"
 
 	# Get a list of slugs representing the plugins that want updating
 	plugins_needing_updates=$(wp plugin list --field=name --update=available --allow-root) # returns a list we can parse line by line
@@ -71,40 +97,65 @@ function do_plugins_update {
 		# Get the current version
 		ver=$(wp plugin get $slug --field=version --allow-root)
 
-		# Run the update (and log that we're about to run it)
-		wp plugin update $slug --quiet --allow-root
+		# Print to screen and logfile that we're about to begin updating the plugin
+		printf "$(timestamp) Starting update of plugin %s (currently at version %s)...\n" "$name" "$ver"	
+		printf "$(timestamp) Starting update of plugin %s (currently at version %s).\n" "$name" "$ver" >> "$LOG_FILE"
+
+		# Do the update
+		updating="$(wp plugin update $slug --format=summary --allow-root)"
 		
-		# Get the new version
-		new_ver=$(wp plugin get $slug --field=version --allow-root)
+		# Check the version now (to see if successfully updated)
+		new_ver="$(wp plugin get $slug --field=version --allow-root)"
 		
-		# Add it to list of updates we performed and log that it happened
+
 		if [[ $new_ver != $ver ]]; then
-			report="$report" $(printf "\nUpdated $name from $ver to $new_ver.") #TODO PRoblems with output here. It's only outputting one plugin update per batch run.
-			echo "Updated $name from $ver to $new_ver." >> "$LOG_FILE"
+			# Print success message to screen
+			printf "$(timestamp) Successfully updated %s from %s to %s.\n" "$name" "$ver" "$new_ver"
+			# Print success message to $report var and log file
+			printf "$(timestamp) Successfully updated %s from %s to %s.\n" "$name" "$ver" "$new_ver" >> "$LOG_FILE"			
+			report="$report $(printf "\nUpdated %s from %s to %s." "$name" "$ver" "$new_ver")"
 		else
-			report="$report" $(printf "\nTried to update $name from $ver to $new_ver but had a hiccup somewhere. A human should check this, please.")
+			# Print failure message to screen, log file and report var
+			printf "$(timestamp) Failed to update %s from %s to %s.\n" "$name" "$ver" "$new_ver"
+			printf "$(timestamp) Failed to update %s from %s to %s.\n" "$name" "$ver" "$new_ver" >> "$LOG_FILE"			
+			report="$report $(printf "\nTried to update %s from %s to %s but update failed. A human should check this, please." "$name" "$var" "$new_ver")"
 		fi
+
 	done
 
-	# If we've printed anything to that string, print the details to the log file.
+	# Print to log file that no updates were needed if that's the case, else print 
+	# the accumulated report string to the report file here.
 	report_length=$(printf "%s" "$report"|wc -c)
 	if [[ $report_length -lt 1 ]]; then
-		printf '\n%s\n' "No plugin updates were needed." >> $REPORT_FILE
-		echo "Assessed site as needing no plugin updates." >> "$LOG_FILE"
+		# Print to screen and to report string that no plugin updates were found/needed
+		printf "$(timestamp) No plugin updates were found.\n"
+		report="$report $(printf '\n%s\n' "No plugin updates were found.")"
+		# Log this assessment
+		printf "$(timestamp) Assessed site as needing no plugin updates." >> "$LOG_FILE"
 	else
-		printf '%s\n' "$report" >> "$REPORT_FILE"
+		# Print report of plugins updated and log printing
+		printf "$(timestamp) Updates to site complete. Printing to report." >> "$LOG_FILE"
 	fi
+
+	# Print to report what updates were made
+	printf '%s\n' "$report" >> "$REPORT_FILE"
 }
 
 
-function print_formatted_intro {
+function do_formatted_intro {
 	name_of_site=$(wp option get blogname --allow-root)
 	url=$(wp option get siteurl --allow-root)
 
-	intro=$(printf "\n----------------------------------------------------------\n$name_of_site : $url\n----------------------------------------------------------\n")
-
+	intro=$(printf "\n----------------------------------------------------------\n$(date)\n$name_of_site\n$url\n----------------------------------------------------------\n")
+	
 	printf '\n%s\n' "$intro" >> $REPORT_FILE
 }
+
+
+function timestamp() {
+  date +"%T"
+}
+
 
 
 ### Check input: we need a site, and it must match a folder we're hosting in our /sites dir
@@ -135,12 +186,19 @@ else
 		LOG_FILE=/var/log/wordpress_updates.log
 
 		# Do updates; generate report.
-		
-		report_intro=$(print_formatted_intro)
+		name_of_site=$(wp option get blogname --allow-root)
+		url=$(wp option get siteurl --allow-root)
+		printf "$(timestamp) Checking for updates required on website $name_of_site ($url)\n"
+		printf "$(timestamp) Checking for updates required on website $name_of_site ($url)\n" >> "$LOG_FILE"
 
-		core_report_line=$(do_core_update)
+		# Print pretty report intro
+		do_formatted_intro
 
-		plugins_lines=$(do_plugins_update)
+		# Check/update WordPress core
+		do_core_update
+
+		# Check/update WordPress plugins
+		do_plugins_update
 	fi
 
 fi
