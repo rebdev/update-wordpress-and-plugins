@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 #
 # Script to update WordPress and its plugins by command line interface using WP-CLI
 # Date: 3/11/2015
@@ -11,6 +11,12 @@
 # define('WP_DEBUG', false); // enable debugging mode
 # 
 
+
+### Some globals
+# Adjust these suckers to set output files
+#
+REPORT_FILE=~/bin/updates.txt # File to write pretty reports to
+LOGS_PARENT_DIR="/var/log" 	# Parent directory where this script's log files will be stored
 
 
 # ### Command parameters
@@ -40,6 +46,7 @@ function do_core_update {
 
 	# Print to terminal what we're doing
 	printf "$(timestamp) Checking if WordPress core is up-to-date...\n"
+	printf "$(timestamp) Checking for WordPress core updates...\n" >> $LOG_FILE
 
 	current_version=$(wp core version --allow-root)
 	new_update_version=$(wp core check-update --field=version --allow-root)
@@ -50,7 +57,7 @@ function do_core_update {
 		printf "$(timestamp) Already at latest version of WordPress core.\n"	
 
 		# Print to report what updates were made
-		report=$(printf "No WordPress updates were found.\n")
+		report=$(printf "No WordPress core updates to install.\n")
 															# 
 	else
 		printf "$(timestamp) Updating WordPress core from $current_version to $new_update_version...\n"	
@@ -62,17 +69,17 @@ function do_core_update {
 			# Print result to terminal
 			printf "$(timestamp) Success! WordPress is at the latest version.\n"		
 			# Add a line to the report string if update was successful
-			report=$(printf "Updated WordPress from $current_version to $new_update_version")	
+			report=$(printf "Updated WordPress from $current_version to $new_update_version.\n")	
 		else
 			# Print result to terminal
 			printf "$(timestamp) Failed when trying to update WordPress from $current_version to $new_update_version.\n"	
 			# Add a line to the report string noting there was a failure
-			report=$(printf "Tried to update WordPress from $current_version to $new_update_version but update failed; a human should check this, please.")
+			report=$(printf "Tried to update WordPress from $current_version to $new_update_version but update failed; a human should check this, please.\n")
 		fi
 	fi
 
 	# Print report and log file entry
-	printf '%s' "$report" >> $LOG_FILE
+	printf '%s' "$(timestamp) $report" >> $LOG_FILE
 	printf '%s' "$report" >> $REPORT_FILE
 }
 
@@ -82,7 +89,7 @@ function do_core_update {
 function do_plugins_update {
 
 	printf "$(timestamp) Checking for plugin updates...\n"
-	printf "$(timestamp) Checking plugins...\n" >> $LOG_FILE
+	printf "\n$(timestamp) Checking plugins...\n" >> $LOG_FILE
 
 	# Get a list of slugs representing the plugins that want updating
 	plugins_needing_updates=$(wp plugin list --field=name --update=available --allow-root) # returns a list we can parse line by line
@@ -131,7 +138,7 @@ function do_plugins_update {
 		printf "$(timestamp) No plugin updates were found.\n"
 		report="$report $(printf '\n%s\n' "No plugin updates were found.")"
 		# Log this assessment
-		printf "$(timestamp) Assessed site as needing no plugin updates." >> $LOG_FILE
+		printf "$(timestamp) Found no plugin updates to install.\n" >> $LOG_FILE
 	else
 		# Print report of plugins updated and log printing
 		printf "$(timestamp) Updates to site complete. Printing to report." >> $LOG_FILE
@@ -153,9 +160,13 @@ function do_formatted_intro {
 
 
 function timestamp() {
-  date +"%T"
+	date +"%T" # %T = display time only
 }
 
+
+function datestamp() {
+	date +"%Y-%m-%d"
+}
 
 
 ### Check input: we need a site, and it must match a folder we're hosting in our /sites dir
@@ -181,15 +192,24 @@ else
 		path="/sites/$dir/www/htdocs"
 		cd $path
 
-		# Files to report updates to
-		REPORT_FILE=~/bin/updates.txt
-		LOG_FILE=/var/log/wordpress_updates.log
 
-		# Do updates; generate report.
+		### Set us up the log and report files
+		#
+		#$(mkdir $LOGS_PARENT_DIR/wordpress_updates) # works
+		$([ -d $LOGS_PARENT_DIR/wordpress_updates ] || mkdir $LOGS_PARENT_DIR/wordpress_updates)
+		
+
+		LOGS_PATH=$LOGS_PARENT_DIR/wordpress_updates
+		LOG_FILE=$LOGS_PATH/$(datestamp)_wordpress_updates.log
+
+
+		### Kick off the updates for a site!
+		#
 		name_of_site=$(wp option get blogname --allow-root)
 		url=$(wp option get siteurl --allow-root)
-		printf "$(timestamp) Checking for updates required on website $name_of_site ($url)\n"
-		printf "$(timestamp) Checking for updates required on website $name_of_site ($url)\n" >> $LOG_FILE
+
+		printf "$(timestamp) Checking for updates required on $name_of_site ($url)\n"
+		printf "$(timestamp) Running update script on $name_of_site ($url)\n" >> $LOG_FILE
 
 		# Print pretty report intro
 		do_formatted_intro
