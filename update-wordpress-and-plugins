@@ -10,13 +10,18 @@
 # 
 # define('WP_DEBUG', false); // enable debugging mode
 # 
+# 
+# 
 
 
 ### Some globals
-# Adjust these suckers to set output files
-#
+# The location of this file is sometimes helpful to us so these globals hold that info
+THIS_SCRIPT=`basename $0`
+THIS_SCRIPT_DIR=`dirname $0`
+# Adjust the following to set output files
 REPORT_FILE=~/bin/updates.txt # File to write pretty reports to
 LOGS_PARENT_DIR="/var/log" 	# Parent directory where this script's log files will be stored
+
 
 
 # ### Command parameters
@@ -49,7 +54,9 @@ function do_core_update {
 	printf "$(timestamp) Checking for WordPress core updates...\n" >> $LOG_FILE
 
 	current_version=$(wp core version --allow-root)
+	current_version=$(echo $current_version) # Remove newline char at end
 	new_update_version=$(wp core check-update --field=version --allow-root)
+	new_update_version=$(echo $new_update_version) # Remove newline char at end
 	report='' # what we'll be printing by way of a report
 
 	if [[ $new_update_version == "Success: WordPress is at the latest version." ]]; then
@@ -100,19 +107,22 @@ function do_plugins_update {
 
 		# Get the plugin's name
 		name=$(wp plugin get $slug --field=title --allow-root)
+		name=$(echo $name) # Remove newline char at end
 
 		# Get the current version
 		ver=$(wp plugin get $slug --field=version --allow-root)
+		ver=$(echo $ver) # Remove newline char at end
 
 		# Print to screen and logfile that we're about to begin updating the plugin
 		printf "$(timestamp) Starting update of plugin %s (currently at version %s)...\n" "$name" "$ver"	
 		printf "$(timestamp) Starting update of plugin %s (currently at version %s).\n" "$name" "$ver" >> $LOG_FILE
 
 		# Do the update
-		updating="$(wp plugin update $slug --format=summary --allow-root)"
+		updating="$(wp plugin update $slug --format=summary --allow-root --debug=false)"
 		
 		# Check the version now (to see if successfully updated)
 		new_ver="$(wp plugin get $slug --field=version --allow-root)"
+		new_ver=$(echo $new_ver) # Remove newline char at end
 		
 
 		if [[ $new_ver != $ver ]]; then
@@ -150,8 +160,12 @@ function do_plugins_update {
 
 
 function do_formatted_intro {
+
 	name_of_site=$(wp option get blogname --allow-root)
+	name_of_site=$(echo $name_of_site) # Remove newline char at end
+
 	url=$(wp option get siteurl --allow-root)
+	url=$(echo $url) # Remove newline char at end
 
 	intro=$(printf "\n----------------------------------------------------------\n$(date)\n$name_of_site\n$url\n----------------------------------------------------------\n")
 	
@@ -192,13 +206,10 @@ else
 		path="/sites/$dir/www/htdocs"
 		cd $path
 
-
 		### Set us up the log and report files
 		#
 		#$(mkdir $LOGS_PARENT_DIR/wordpress_updates) # works
 		$([ -d $LOGS_PARENT_DIR/wordpress_updates ] || mkdir $LOGS_PARENT_DIR/wordpress_updates)
-		
-
 		LOGS_PATH=$LOGS_PARENT_DIR/wordpress_updates
 		LOG_FILE=$LOGS_PATH/$(datestamp)_wordpress_updates.log
 
@@ -206,9 +217,12 @@ else
 		### Kick off the updates for a site!
 		#
 		name_of_site=$(wp option get blogname --allow-root)
-		url=$(wp option get siteurl --allow-root)
+		name_of_site=$(echo $name_of_site) # Remove newline char at end
 
-		printf "$(timestamp) Checking for updates required on $name_of_site ($url)\n"
+		url=$(wp option get siteurl --allow-root)
+		url=$(echo $url) # Remove newline char at end
+
+		printf "$(timestamp) Checking for updates required on %s (%s)\n" "$name_of_site" "$url"
 		printf "$(timestamp) Running update script on $name_of_site ($url)\n" >> $LOG_FILE
 
 		# Print pretty report intro
