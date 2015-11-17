@@ -37,7 +37,7 @@ fi
 
 ### Require WP-CLI be installed
 #
-$ command -v wp >/dev/null 2>&1 || { echo >&2 "You need to have WP-CLI installed and in your path as 'wp' to use this script."; exit 1; }
+command -v wp >/dev/null 2>&1 || { echo >&2 "You need to have WP-CLI installed and in your path as 'wp' to use this script."; exit 1; }
 
 
 
