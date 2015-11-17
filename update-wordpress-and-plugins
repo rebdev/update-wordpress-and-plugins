@@ -20,7 +20,7 @@ THIS_SCRIPT=`basename $0`
 THIS_SCRIPT_DIR=`dirname $0`
 # Adjust the following to set output files
 REPORT_FILE=~/bin/updates.txt # File to write pretty reports to
-LOGS_PARENT_DIR="/var/log" 	# Parent directory where this script's log files will be stored
+LOGS_PARENT_DIR="/root/logs" 	# Parent directory where this script's log files will be stored
 
 
 
